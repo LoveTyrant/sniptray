@@ -307,6 +307,7 @@ unsafe extern "system" fn wndproc(
                 let _ = UnregisterHotKey(Some(st.main_hwnd), HOTKEY_ID);
                 crate::register_hotkey(st.main_hwnd);
                 crate::tray::update_tooltip(st.main_hwnd);
+                crate::settings::refresh_hotkey_label();
             }
             LRESULT(0)
         }

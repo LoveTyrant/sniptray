@@ -5,6 +5,7 @@ mod capture;
 mod config;
 mod hotkey_ui;
 mod overlay;
+mod settings;
 mod snip;
 mod thumb;
 mod tray;
@@ -30,10 +31,9 @@ pub const WM_TRAYICON: u32 = WM_APP + 1;
 pub const HOTKEY_ID: i32 = 1;
 
 pub const CMD_SNIP: usize = 101;
-pub const CMD_HOTKEY: usize = 102;
-pub const CMD_STARTUP: usize = 103;
 pub const CMD_FOLDER: usize = 104;
 pub const CMD_EXIT: usize = 105;
+pub const CMD_SETTINGS: usize = 106;
 
 thread_local! {
     pub static CONFIG: RefCell<config::Config> = RefCell::new(config::Config::default());
@@ -194,8 +194,7 @@ unsafe extern "system" fn main_wndproc(
         WM_COMMAND => {
             match util::loword_w(wparam) as usize {
                 CMD_SNIP => start_snip(hwnd),
-                CMD_HOTKEY => hotkey_ui::open(hwnd),
-                CMD_STARTUP => config::set_startup(!config::startup_enabled()),
+                CMD_SETTINGS => settings::open(hwnd),
                 CMD_FOLDER => open_snips_folder(),
                 CMD_EXIT => {
                     let _ = DestroyWindow(hwnd);

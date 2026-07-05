@@ -34,20 +34,26 @@ Press the hotkey (or left-click the tray icon), drag, release. Then:
 
 While selecting, `Esc` or right-click cancels.
 
-**Tray menu** (right-click the icon): *Snip now* · *Set hotkey…* · *Start with
-Windows* · *Open snips folder* · *Exit*.
+**Tray menu** (right-click the icon): *Snip now* · *Settings…* · *Open snips
+folder* · *Exit*.
 
-When setting a hotkey: plain letters need a modifier (Ctrl/Alt/Shift/Win);
-F-keys and PrtSc also work alone. Combinations owned by other apps are
-rejected with a message.
+## Settings
 
-## Configuration
+Right-click the tray icon → **Settings…**:
 
-`%APPDATA%\SnipTray\config.json` — created on first run. `save_dir` can be set
-to change where PNGs are stored (empty = `Pictures\Snips`).
-`clipboard_path_text` (default `true`) controls whether the saved file's path
-is also placed on the clipboard as text; set it to `false` if an app you paste
-into prefers the text over the image.
+- **Snip hotkey** — shows the current binding; *Change…* opens a capture
+  window: press any combination. Plain letters need a modifier
+  (Ctrl/Alt/Shift/Win); F-keys and PrtSc also work alone. Combinations owned
+  by other apps are rejected with a message.
+- **Start with Windows** — registers/unregisters the app in the user Run key.
+- **Also copy file path as text** — puts the saved PNG's path on the clipboard
+  as text alongside the image, so terminal-hosted tools (Claude Code etc.) can
+  pick the snip up from a plain paste. Untick it if an app you paste into
+  prefers the text over the image.
+- **Save snips to** — where PNGs are stored (*Default* = `Pictures\Snips`).
+
+All changes apply immediately. Settings persist in
+`%APPDATA%\SnipTray\config.json`.
 
 The *Start with Windows* toggle writes an `HKCU\...\Run` entry pointing at the
 exe's current location; re-toggle it if you move the exe.

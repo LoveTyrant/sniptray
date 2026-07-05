@@ -7,7 +7,7 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::util::copy_wstr;
-use crate::{config, CMD_EXIT, CMD_FOLDER, CMD_HOTKEY, CMD_SNIP, CMD_STARTUP, WM_TRAYICON};
+use crate::{CMD_EXIT, CMD_FOLDER, CMD_SETTINGS, CMD_SNIP, WM_TRAYICON};
 
 const TRAY_ID: u32 = 1;
 
@@ -64,8 +64,7 @@ pub fn show_menu(hwnd: HWND) {
         let Ok(menu) = CreatePopupMenu() else { return };
         let hk = crate::CONFIG.with(|c| c.borrow().hotkey_string());
         append(menu, CMD_SNIP, &format!("Snip now\t{hk}"), false);
-        append(menu, CMD_HOTKEY, "Set hotkey…", false);
-        append(menu, CMD_STARTUP, "Start with Windows", config::startup_enabled());
+        append(menu, CMD_SETTINGS, "Settings…", false);
         append(menu, CMD_FOLDER, "Open snips folder", false);
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
         append(menu, CMD_EXIT, "Exit", false);
