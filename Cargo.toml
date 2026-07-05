@@ -1,0 +1,42 @@
+[package]
+name = "sniptray"
+version = "0.1.0"
+edition = "2021"
+description = "Lightweight system-tray snipping tool for Windows"
+authors = ["LoveTyrant"]
+license = "MIT"
+readme = "README.md"
+keywords = ["screenshot", "snipping", "windows", "tray", "screen-capture"]
+categories = ["multimedia::images", "os::windows-apis"]
+
+[dependencies]
+png = "0.17"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dependencies.windows]
+version = "0.61"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_HiDpi",
+    "Win32_System_Com",
+    "Win32_System_Ole",
+    "Win32_System_Memory",
+    "Win32_System_DataExchange",
+    "Win32_System_Registry",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_System_SystemInformation",
+    "Win32_Security",
+]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
