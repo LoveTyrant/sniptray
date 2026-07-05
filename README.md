@@ -12,8 +12,12 @@ Win32 via the [`windows`](https://crates.io/crates/windows) crate — a single
 - **Drag the result anywhere** — a preview thumbnail appears bottom-right;
   drag it into any window (chat apps, browsers, editors, terminals, Explorer)
   to drop the screenshot as a file
-- **Clipboard too** — every snip is copied as an image (DIB + PNG formats),
-  so `Ctrl+V` works everywhere
+- **Clipboard too** — every snip is copied as an image (DIB + PNG formats)
+  *and* as the saved file's path in text form, so `Ctrl+V` works everywhere —
+  image-aware apps paste the picture, terminals paste the path
+- **Terminal-AI friendly** — paste into Claude Code (or similar TUI tools) and
+  it picks the snip up from the pasted path, even in terminals like Warp that
+  don't forward file drops or images to TUI apps
 - **Saved automatically** to `Pictures\Snips` as timestamped PNGs
 - **Rebindable hotkey** and **start-with-Windows** toggle, right in the tray menu
 - Multi-monitor and per-monitor-DPI aware
@@ -41,6 +45,9 @@ rejected with a message.
 
 `%APPDATA%\SnipTray\config.json` — created on first run. `save_dir` can be set
 to change where PNGs are stored (empty = `Pictures\Snips`).
+`clipboard_path_text` (default `true`) controls whether the saved file's path
+is also placed on the clipboard as text; set it to `false` if an app you paste
+into prefers the text over the image.
 
 The *Start with Windows* toggle writes an `HKCU\...\Run` entry pointing at the
 exe's current location; re-toggle it if you move the exe.

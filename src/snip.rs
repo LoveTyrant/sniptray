@@ -6,7 +6,7 @@ use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::DataExchange::*;
 use windows::Win32::System::Memory::*;
-use windows::Win32::System::Ole::CF_DIB;
+use windows::Win32::System::Ole::{CF_DIB, CF_UNICODETEXT};
 use windows::Win32::System::SystemInformation::GetLocalTime;
 
 use crate::{capture, config, thumb};
@@ -21,10 +21,10 @@ pub fn complete(shot: &capture::Screenshot, sel: RECT, owner: HWND) {
         return;
     };
     let png = encode_png(&bgra, w, h);
-    if let Some(ref png) = png {
-        set_clipboard(owner, &bgra, w, h, png);
-    }
     let path = png.as_deref().and_then(save_png);
+    if let Some(ref png) = png {
+        set_clipboard(owner, &bgra, w, h, png, path.as_deref());
+    }
     match path {
         Some(p) => thumb::show(hcrop, w, h, p),
         None => unsafe {
@@ -63,16 +63,19 @@ fn save_png(png: &[u8]) -> Option<String> {
     Some(path.to_string_lossy().into_owned())
 }
 
-/// Put the image on the clipboard as both CF_DIB and "PNG".
-fn set_clipboard(owner: HWND, bgra: &[u8], w: i32, h: i32, png: &[u8]) {
+/// Put the image on the clipboard as CF_DIB and "PNG", plus (optionally) the
+/// saved file's path as CF_UNICODETEXT. The text rendition is what lets
+/// terminal-hosted apps (Claude Code in Warp, etc.) pick the snip up from a
+/// plain paste, since those hosts only forward text to TUI programs.
+fn set_clipboard(owner: HWND, bgra: &[u8], w: i32, h: i32, png: &[u8], path: Option<&str>) {
     unsafe {
         let mut opened = false;
-        for _ in 0..5 {
+        for _ in 0..10 {
             if OpenClipboard(Some(owner)).is_ok() {
                 opened = true;
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(15));
+            std::thread::sleep(std::time::Duration::from_millis(30));
         }
         if !opened {
             return;
@@ -104,6 +107,16 @@ fn set_clipboard(owner: HWND, bgra: &[u8], w: i32, h: i32, png: &[u8]) {
         let png_fmt = RegisterClipboardFormatW(w!("PNG"));
         if png_fmt != 0 {
             put_format(png_fmt, png);
+        }
+
+        if let Some(path) = path {
+            let want_text = crate::CONFIG.with(|c| c.borrow().clipboard_path_text);
+            if want_text {
+                let w16: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+                let bytes =
+                    std::slice::from_raw_parts(w16.as_ptr() as *const u8, w16.len() * 2);
+                put_format(CF_UNICODETEXT.0 as u32, bytes);
+            }
         }
 
         let _ = CloseClipboard();

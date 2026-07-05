@@ -16,6 +16,10 @@ pub struct Config {
     pub hotkey_vk: u32,
     /// Empty = default (Pictures\Snips)
     pub save_dir: String,
+    /// Also place the saved PNG's file path on the clipboard as text.
+    /// Terminal apps (e.g. Claude Code) attach images from pasted paths,
+    /// and terminals like Warp only paste text into TUIs.
+    pub clipboard_path_text: bool,
     pub first_run: bool,
 }
 
@@ -25,6 +29,7 @@ impl Default for Config {
             hotkey_mods: MOD_CONTROL.0,
             hotkey_vk: VK_SNAPSHOT.0 as u32,
             save_dir: String::new(),
+            clipboard_path_text: true,
             first_run: true,
         }
     }

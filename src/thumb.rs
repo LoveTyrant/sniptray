@@ -3,10 +3,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::System::Com::IDataObject;
+use windows::Win32::System::Com::{
+    IDataObject, DVASPECT_CONTENT, FORMATETC, STGMEDIUM, STGMEDIUM_0, TYMED_HGLOBAL,
+};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
 use windows::Win32::System::Ole::{
-    DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropSource,
+    CF_UNICODETEXT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropSource,
 };
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture, VK_ESCAPE};
@@ -125,6 +128,11 @@ unsafe fn do_drag(hwnd: HWND, path: &str) -> bool {
         Ok(d) => d,
         Err(_) => return false,
     };
+    // Also offer the path as plain text. Some drop targets (e.g. terminals
+    // like Warp that hijack file drops for their own UI) will insert dropped
+    // text into the prompt instead — which is exactly what a TUI app such as
+    // Claude Code needs to pick the image up.
+    add_text_format(&dobj, path);
     let effect = SHDoDragDrop(
         Some(hwnd),
         &dobj,
@@ -133,6 +141,35 @@ unsafe fn do_drag(hwnd: HWND, path: &str) -> bool {
     )
     .unwrap_or(DROPEFFECT_NONE);
     effect != DROPEFFECT_NONE
+}
+
+/// Attach a CF_UNICODETEXT rendition of the file path to the drag data object.
+unsafe fn add_text_format(dobj: &IDataObject, path: &str) {
+    let w: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    let bytes = w.len() * 2;
+    let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, bytes) else {
+        return;
+    };
+    let ptr = GlobalLock(hglobal);
+    if ptr.is_null() {
+        return;
+    }
+    std::ptr::copy_nonoverlapping(w.as_ptr() as *const u8, ptr as *mut u8, bytes);
+    let _ = GlobalUnlock(hglobal);
+    let fe = FORMATETC {
+        cfFormat: CF_UNICODETEXT.0,
+        ptd: std::ptr::null_mut(),
+        dwAspect: DVASPECT_CONTENT.0 as u32,
+        lindex: -1,
+        tymed: TYMED_HGLOBAL.0 as u32,
+    };
+    let sm = STGMEDIUM {
+        tymed: TYMED_HGLOBAL.0 as u32,
+        u: STGMEDIUM_0 { hGlobal: hglobal },
+        pUnkForRelease: std::mem::ManuallyDrop::new(None),
+    };
+    // fRelease = true: the data object takes ownership of the HGLOBAL.
+    let _ = dobj.SetData(&fe, &sm, true);
 }
 
 unsafe extern "system" fn wndproc(
