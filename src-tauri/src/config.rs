@@ -18,6 +18,13 @@ pub struct Config {
     /// Terminal apps (e.g. Claude Code) attach images from pasted paths,
     /// and terminals like Warp only paste text into TUIs.
     pub clipboard_path_text: bool,
+    /// After dropping the preview onto one of `terminal_drop_processes`,
+    /// type the file path into it. Those apps hijack file drops for their
+    /// own UI, so the terminal (and any TUI in it, like Claude Code) never
+    /// sees the drop otherwise.
+    pub terminal_drop_assist: bool,
+    /// Lower-case executable names that swallow file drops.
+    pub terminal_drop_processes: Vec<String>,
     pub first_run: bool,
 }
 
@@ -27,6 +34,8 @@ impl Default for Config {
             hotkey: "Control+PrintScreen".to_string(),
             save_dir: String::new(),
             clipboard_path_text: true,
+            terminal_drop_assist: true,
+            terminal_drop_processes: vec!["warp.exe".to_string()],
             first_run: true,
         }
     }

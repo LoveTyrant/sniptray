@@ -11,8 +11,16 @@ use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM
 use windows::Win32::System::Ole::{
     CF_UNICODETEXT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropSource,
 };
+use windows::core::PWSTR;
+use windows::Win32::System::Threading::{
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
+    PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
-use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture, VK_ESCAPE};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetKeyState, ReleaseCapture, SendInput, SetCapture, INPUT, INPUT_0, INPUT_KEYBOARD,
+    KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_ESCAPE,
+};
 use windows::Win32::UI::Shell::{
     SHCreateItemFromParsingName, SHDoDragDrop, BHID_DataObject, IShellItem,
 };
@@ -134,7 +142,105 @@ unsafe fn do_drag(hwnd: HWND, path: &str) -> bool {
         DROPEFFECT_COPY | DROPEFFECT_LINK,
     )
     .unwrap_or(DROPEFFECT_NONE);
-    effect != DROPEFFECT_NONE
+    // Esc during the drag means the user cancelled — never assist then.
+    let cancelled = GetKeyState(VK_ESCAPE.0 as i32) < 0;
+    let assisted = if cancelled {
+        false
+    } else {
+        // Run the assist whether or not the target reported a drop effect:
+        // Warp variously swallows the drop into its own UI (reports COPY)
+        // or rejects it outright (reports NONE) — in both cases the
+        // terminal never saw the file.
+        maybe_assist_terminal_drop(path)
+    };
+    effect != DROPEFFECT_NONE || assisted
+}
+
+/// Some apps (notably Warp) take file drops away from the terminal — or
+/// refuse them — so a TUI running inside (like Claude Code) never sees the
+/// file. When the drag ends over such an app, deliver the path another way:
+/// focus the window and type the path as keyboard input. Returns true if
+/// the path was typed.
+unsafe fn maybe_assist_terminal_drop(path: &str) -> bool {
+    let procs = {
+        let cfg = crate::config::CONFIG.lock().unwrap();
+        if !cfg.terminal_drop_assist {
+            return false;
+        }
+        cfg.terminal_drop_processes.clone()
+    };
+    if procs.is_empty() {
+        return false;
+    }
+    let mut pt = POINT::default();
+    if GetCursorPos(&mut pt).is_err() {
+        return false;
+    }
+    let under = WindowFromPoint(pt);
+    if under.is_invalid() {
+        return false;
+    }
+    let root = GetAncestor(under, GA_ROOT);
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(root, Some(&mut pid));
+    if pid == 0 {
+        return false;
+    }
+    let Some(name) = process_name(pid) else {
+        return false;
+    };
+    if !procs.iter().any(|p| p.eq_ignore_ascii_case(&name)) {
+        return false;
+    }
+    let _ = SetForegroundWindow(root);
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    // Only type if the target really is foreground — never spray keystrokes
+    // into an unrelated window.
+    if GetForegroundWindow() != root {
+        return false;
+    }
+    send_unicode_string(path);
+    true
+}
+
+fn process_name(pid: u32) -> Option<String> {
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 512];
+        let mut len = buf.len() as u32;
+        let ok =
+            QueryFullProcessImageNameW(h, PROCESS_NAME_FORMAT(0), PWSTR(buf.as_mut_ptr()), &mut len)
+                .is_ok();
+        let _ = windows::Win32::Foundation::CloseHandle(h);
+        if !ok {
+            return None;
+        }
+        let full = String::from_utf16_lossy(&buf[..len as usize]);
+        full.rsplit(['\\', '/'])
+            .next()
+            .map(|s| s.to_ascii_lowercase())
+    }
+}
+
+unsafe fn send_unicode_string(s: &str) {
+    let mut inputs: Vec<INPUT> = Vec::new();
+    for u in s.encode_utf16() {
+        for flags in [KEYEVENTF_UNICODE, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP] {
+            inputs.push(INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: VIRTUAL_KEY(0),
+                        wScan: u,
+                        dwFlags: flags,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            });
+        }
+    }
+    let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
 }
 
 /// Attach a CF_UNICODETEXT rendition of the file path to the drag data object.

@@ -7,6 +7,8 @@ type Config = {
   hotkey: string;
   save_dir: string;
   clipboard_path_text: boolean;
+  terminal_drop_assist: boolean;
+  terminal_drop_processes: string[];
   first_run: boolean;
 };
 
@@ -176,6 +178,24 @@ export default function App() {
             onChange={async (v) => {
               await invoke("set_clipboard_path_text", { value: v });
               setCfg({ ...cfg, clipboard_path_text: v });
+              flashSaved();
+            }}
+          />
+        </div>
+        <div className="row">
+          <div className="row-text">
+            <span className="label">Terminal drop assist</span>
+            <span className="hint">
+              Warp hijacks file drops, so a dropped snip never reaches the
+              terminal. With this on, dropping onto Warp types the file path
+              instead — Claude Code attaches it automatically.
+            </span>
+          </div>
+          <Toggle
+            checked={cfg.terminal_drop_assist}
+            onChange={async (v) => {
+              await invoke("set_terminal_drop_assist", { value: v });
+              setCfg({ ...cfg, terminal_drop_assist: v });
               flashSaved();
             }}
           />

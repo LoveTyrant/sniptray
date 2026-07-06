@@ -180,6 +180,13 @@ fn set_clipboard_path_text(value: bool) {
 }
 
 #[tauri::command]
+fn set_terminal_drop_assist(value: bool) {
+    let mut c = config::CONFIG.lock().unwrap();
+    c.terminal_drop_assist = value;
+    c.save();
+}
+
+#[tauri::command]
 fn set_save_dir(dir: String) -> String {
     {
         let mut c = config::CONFIG.lock().unwrap();
@@ -250,6 +257,14 @@ fn save_edited(path: String, data_url: String) -> Result<(), String> {
 // --------------------------------------------------------------------- main
 
 fn main() {
+    // The thumbnail's drag-out (SHDoDragDrop) requires OLE on the main
+    // thread. Tauri/tao only get OLE going once a webview exists, so a
+    // drag before any window has opened would fail with
+    // CO_E_NOTINITIALIZED. Initialize it up front.
+    unsafe {
+        let _ = windows::Win32::System::Ole::OleInitialize(None);
+    }
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             open_settings(app);
@@ -269,6 +284,7 @@ fn main() {
             get_settings,
             effective_save_dir,
             set_clipboard_path_text,
+            set_terminal_drop_assist,
             set_save_dir,
             set_hotkey,
             snip_now,

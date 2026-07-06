@@ -20,6 +20,10 @@ and annotation.
 - **Terminal-AI friendly** — paste into Claude Code (or similar TUI tools) and
   it picks the snip up from the pasted path, even in terminals like Warp that
   don't forward file drops or images to TUI apps
+- **Terminal drop assist** — Warp intercepts file drops, so a dropped snip
+  would never reach the TUI inside; SnipTray detects a drop onto Warp and
+  types the file path into the terminal instead, so drag & drop works with
+  Claude Code running in Warp (configurable: `terminal_drop_processes`)
 - **Saved automatically** to `Pictures\Snips` as timestamped PNGs
 
 ## Usage
