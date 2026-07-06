@@ -16,7 +16,6 @@ const CLASS_NAME: PCWSTR = w!("SnipTrayOverlay");
 struct OverlayState {
     shot: Screenshot,
     dim: HBITMAP,
-    main_hwnd: HWND,
     // Persistent double-buffer.
     buf_dc: HDC,
     buf_bmp: HBITMAP,
@@ -26,7 +25,7 @@ struct OverlayState {
     cur: POINT,
 }
 
-pub fn show(shot: Screenshot, main_hwnd: HWND) -> Result<()> {
+pub fn show(shot: Screenshot) -> Result<()> {
     unsafe {
         let hinstance: HINSTANCE = GetModuleHandleW(None)?.into();
         if !CLASS_REGISTERED.swap(true, Ordering::SeqCst) {
@@ -47,7 +46,6 @@ pub fn show(shot: Screenshot, main_hwnd: HWND) -> Result<()> {
         let state = Box::new(OverlayState {
             shot,
             dim,
-            main_hwnd,
             buf_dc: HDC::default(),
             buf_bmp: HBITMAP::default(),
             buf_old: HGDIOBJ::default(),
@@ -222,7 +220,7 @@ unsafe extern "system" fn wndproc(
                     let r = norm_rect(st.start, st.cur, st.shot.w, st.shot.h);
                     if r.right - r.left >= 3 && r.bottom - r.top >= 3 {
                         let _ = ShowWindow(hwnd, SW_HIDE);
-                        crate::snip::complete(&st.shot, r, st.main_hwnd);
+                        crate::snip::complete(&st.shot, r);
                     }
                     let _ = DestroyWindow(hwnd);
                 }

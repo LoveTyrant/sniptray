@@ -12,7 +12,7 @@ use windows::Win32::System::SystemInformation::GetLocalTime;
 use crate::{capture, config, thumb};
 
 /// Called by the overlay once a region has been selected (bitmap coordinates).
-pub fn complete(shot: &capture::Screenshot, sel: RECT, owner: HWND) {
+pub fn complete(shot: &capture::Screenshot, sel: RECT) {
     let Some((hcrop, w, h)) = capture::crop(shot, &sel) else {
         return;
     };
@@ -23,7 +23,7 @@ pub fn complete(shot: &capture::Screenshot, sel: RECT, owner: HWND) {
     let png = encode_png(&bgra, w, h);
     let path = png.as_deref().and_then(save_png);
     if let Some(ref png) = png {
-        set_clipboard(owner, &bgra, w, h, png, path.as_deref());
+        set_clipboard(&bgra, w, h, png, path.as_deref());
     }
     match path {
         Some(p) => thumb::show(hcrop, w, h, p),
@@ -31,6 +31,37 @@ pub fn complete(shot: &capture::Screenshot, sel: RECT, owner: HWND) {
             let _ = DeleteObject(hcrop.into());
         },
     }
+}
+
+/// Re-set the clipboard from edited PNG bytes (used by the editor's save).
+pub fn reclip_png(png_bytes: &[u8], path: &str) -> Option<()> {
+    let decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0u8; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).ok()?;
+    let (w, h) = (info.width as i32, info.height as i32);
+    let mut bgra = vec![0u8; (w as usize) * (h as usize) * 4];
+    match info.color_type {
+        png::ColorType::Rgba => {
+            for (dst, src) in bgra.chunks_exact_mut(4).zip(buf.chunks_exact(4)) {
+                dst[0] = src[2];
+                dst[1] = src[1];
+                dst[2] = src[0];
+                dst[3] = 0xFF;
+            }
+        }
+        png::ColorType::Rgb => {
+            for (dst, src) in bgra.chunks_exact_mut(4).zip(buf.chunks_exact(3)) {
+                dst[0] = src[2];
+                dst[1] = src[1];
+                dst[2] = src[0];
+                dst[3] = 0xFF;
+            }
+        }
+        _ => return None,
+    }
+    set_clipboard(&bgra, w, h, png_bytes, Some(path));
+    Some(())
 }
 
 pub fn encode_png(bgra: &[u8], w: i32, h: i32) -> Option<Vec<u8>> {
@@ -50,7 +81,7 @@ pub fn encode_png(bgra: &[u8], w: i32, h: i32) -> Option<Vec<u8>> {
 }
 
 fn save_png(png: &[u8]) -> Option<String> {
-    let dir = crate::CONFIG.with(|c| config::snips_dir(&c.borrow()));
+    let dir = config::snips_dir(&config::CONFIG.lock().unwrap());
     std::fs::create_dir_all(&dir).ok()?;
     let st = unsafe { GetLocalTime() };
     let name = format!(
@@ -67,11 +98,11 @@ fn save_png(png: &[u8]) -> Option<String> {
 /// saved file's path as CF_UNICODETEXT. The text rendition is what lets
 /// terminal-hosted apps (Claude Code in Warp, etc.) pick the snip up from a
 /// plain paste, since those hosts only forward text to TUI programs.
-fn set_clipboard(owner: HWND, bgra: &[u8], w: i32, h: i32, png: &[u8], path: Option<&str>) {
+fn set_clipboard(bgra: &[u8], w: i32, h: i32, png: &[u8], path: Option<&str>) {
     unsafe {
         let mut opened = false;
         for _ in 0..10 {
-            if OpenClipboard(Some(owner)).is_ok() {
+            if OpenClipboard(None).is_ok() {
                 opened = true;
                 break;
             }
@@ -110,7 +141,7 @@ fn set_clipboard(owner: HWND, bgra: &[u8], w: i32, h: i32, png: &[u8], path: Opt
         }
 
         if let Some(path) = path {
-            let want_text = crate::CONFIG.with(|c| c.borrow().clipboard_path_text);
+            let want_text = config::CONFIG.lock().unwrap().clipboard_path_text;
             if want_text {
                 let w16: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
                 let bytes =

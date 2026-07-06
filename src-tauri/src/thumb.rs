@@ -14,7 +14,7 @@ use windows::Win32::System::Ole::{
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture, VK_ESCAPE};
 use windows::Win32::UI::Shell::{
-    SHCreateItemFromParsingName, SHDoDragDrop, BHID_DataObject, IShellItem, ShellExecuteW,
+    SHCreateItemFromParsingName, SHDoDragDrop, BHID_DataObject, IShellItem,
 };
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -101,14 +101,8 @@ pub fn show(hbmp: HBITMAP, img_w: i32, img_h: i32, path: String) {
             Some(hinstance),
             Some(Box::into_raw(state) as *const _),
         );
-        match hwnd {
-            Ok(hwnd) => {
-                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-            }
-            Err(_) => {
-                // state box leaked deliberately impossible: CreateWindowExW failed before WM_NCCREATE consumed it;
-                // nothing more we can do safely except leave the file on disk.
-            }
+        if let Ok(hwnd) = hwnd {
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
     }
 }
@@ -129,9 +123,9 @@ unsafe fn do_drag(hwnd: HWND, path: &str) -> bool {
         Err(_) => return false,
     };
     // Also offer the path as plain text. Some drop targets (e.g. terminals
-    // like Warp that hijack file drops for their own UI) will insert dropped
-    // text into the prompt instead — which is exactly what a TUI app such as
-    // Claude Code needs to pick the image up.
+    // that hijack file drops for their own UI) will insert dropped text into
+    // the prompt instead — which is exactly what a TUI app such as Claude
+    // Code needs to pick the image up.
     add_text_format(&dobj, path);
     let effect = SHDoDragDrop(
         Some(hwnd),
@@ -251,7 +245,7 @@ unsafe extern "system" fn wndproc(
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, COLORREF(0x00585858));
                 let of = SelectObject(hdc, st.font.into());
-                let mut text = wide("drag into an app · right-click closes");
+                let mut text = wide("drag into app · double-click edits · right-click closes");
                 let mut trc = bar;
                 trc.left += 6;
                 trc.right -= 6;
@@ -301,15 +295,8 @@ unsafe extern "system" fn wndproc(
         }
         WM_LBUTTONDBLCLK => {
             if let Some(st) = state(hwnd) {
-                let path = wide(&st.path);
-                ShellExecuteW(
-                    None,
-                    w!("open"),
-                    PCWSTR(path.as_ptr()),
-                    None,
-                    None,
-                    SW_SHOWNORMAL,
-                );
+                crate::open_editor(st.path.clone());
+                let _ = DestroyWindow(hwnd);
             }
             LRESULT(0)
         }

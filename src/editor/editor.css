@@ -1,0 +1,140 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  background: #131418;
+  color: #e8e8ea;
+  font-size: 13px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #1d1e24;
+  border-bottom: 1px solid #2a2b33;
+  flex: none;
+}
+
+.tools,
+.colors {
+  display: flex;
+  gap: 4px;
+}
+
+.tool {
+  width: 34px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #cfcfd6;
+  font-size: 15px;
+  line-height: 1;
+}
+.tool:hover {
+  background: #26272f;
+}
+.tool.active {
+  background: #2b3a55;
+  border-color: #3b82f6;
+  color: #fff;
+}
+.tool:disabled {
+  opacity: 0.35;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
+.sep {
+  width: 1px;
+  height: 22px;
+  background: #2f3038;
+}
+
+.grow {
+  flex: 1;
+}
+
+.toast {
+  color: #4ade80;
+  font-size: 12.5px;
+}
+
+.btn {
+  padding: 7px 16px;
+  border-radius: 7px;
+  border: 1px solid #34353f;
+  background: #26272f;
+  color: #e8e8ea;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+.btn.primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+}
+.btn.primary:hover {
+  background: #2f74ea;
+}
+
+.canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  position: relative;
+}
+
+canvas {
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  cursor: crosshair;
+}
+
+.text-input {
+  position: fixed;
+  min-width: 180px;
+  min-height: 34px;
+  background: rgba(20, 20, 25, 0.85);
+  border: 1px dashed #3b82f6;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+  resize: both;
+}
