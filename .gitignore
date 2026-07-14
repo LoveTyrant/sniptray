@@ -1,5 +1,27 @@
+# Build artifacts
 /target
 node_modules/
 dist/
+dist-ssr/
 src-tauri/target/
 src-tauri/gen/
+
+# Environment / secrets (never commit these)
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.pfx
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor junk
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
