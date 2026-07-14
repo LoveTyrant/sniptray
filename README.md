@@ -47,7 +47,11 @@ Right-click the tray icon → **Settings…**:
   apps are rejected.
 - **Start with Windows**
 - **Copy file path as text** — the terminal-paste behavior described above
-- **Save snips to** — with a native folder picker
+- **Terminal drop assist** — toggles the Warp drop-to-path behavior described
+  above (the list of apps it applies to is the config file's
+  `terminal_drop_processes`)
+- **Save snips to** — **Browse…** for a native folder picker, or **Default** to
+  reset to `Pictures\Snips`. An **Open folder** button reveals the current one.
 
 All changes apply immediately. Config lives at `%APPDATA%\SnipTray\config.json`.
 
@@ -80,6 +84,7 @@ window of the running one.
 - `src-tauri/src/thumb.rs` — native preview window with OLE drag-out
   (`SHDoDragDrop` + CF_UNICODETEXT path rendition)
 - `src-tauri/src/main.rs` — Tauri shell: tray, global shortcut, IPC commands
+- `src-tauri/src/config.rs` — settings model, defaults, JSON persistence
 - `src/settings`, `src/editor` — React UIs
 
 ## License
