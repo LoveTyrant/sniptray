@@ -208,7 +208,7 @@ fn open_settings(app: &AppHandle) {
     // Fit the window to the screen's usable area (minus taskbar and title
     // bar): on small or high-scaling screens the full height doesn't fit.
     // The page scrolls, and the window can be resized either way.
-    let (mut w, mut h) = (500.0_f64, 780.0_f64);
+    let (mut w, mut h) = (650.0_f64, 470.0_f64);
     if let Some((aw, ah)) = primary_work_area(app) {
         w = w.min(aw - 32.0);
         h = h.min(ah - 80.0);
