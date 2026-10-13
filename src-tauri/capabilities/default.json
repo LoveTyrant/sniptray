@@ -4,6 +4,7 @@
   "windows": ["settings", "editor-*"],
   "permissions": [
     "core:default",
+    "core:window:allow-destroy",
     "dialog:default",
     "autostart:default"
   ]

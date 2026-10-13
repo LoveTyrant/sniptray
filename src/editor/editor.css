@@ -86,6 +86,15 @@ body {
 .toast {
   color: #4ade80;
   font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.toolbar input[type="range"] {
+  width: 96px;
+  flex: none;
 }
 
 .btn {
@@ -96,6 +105,8 @@ body {
   color: #e8e8ea;
   font-family: inherit;
   font-size: 12.5px;
+  white-space: nowrap;
+  flex: none;
 }
 .btn.primary {
   background: #3b82f6;
@@ -105,6 +116,34 @@ body {
 }
 .btn.primary:hover {
   background: #2f74ea;
+}
+
+.resize-pop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #191a20;
+  border-bottom: 1px solid #2a2b33;
+  flex: none;
+}
+.resize-pop .dim {
+  color: #8b8c96;
+  font-size: 12.5px;
+}
+.resize-pop input[type="number"] {
+  width: 76px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid #34353f;
+  background: #131418;
+  color: #e8e8ea;
+  font-family: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+.resize-pop input[type="number"]:focus {
+  border-color: #3b82f6;
 }
 
 .canvas-wrap {
@@ -122,6 +161,39 @@ canvas {
   max-height: 100%;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
   cursor: crosshair;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.modal {
+  width: min(380px, calc(100vw - 32px));
+  background: #1d1e24;
+  border: 1px solid #2f3038;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.modal h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.modal p {
+  color: #9a9aa3;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .text-input {
