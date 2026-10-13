@@ -1,6 +1,9 @@
 use std::ffi::c_void;
 
 use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Dwm::{
+    DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS,
+};
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -45,6 +48,141 @@ pub fn capture_virtual_screen() -> Option<Screenshot> {
             return None;
         }
         Some(Screenshot { hbmp, x, y, w, h })
+    }
+}
+
+pub fn rect_contains(r: &RECT, p: POINT) -> bool {
+    p.x >= r.left && p.x < r.right && p.y >= r.top && p.y < r.bottom
+}
+
+/// Clip a screen rect to the screenshot, in bitmap coordinates.
+fn to_bitmap_rect(shot: &Screenshot, r: &RECT) -> RECT {
+    RECT {
+        left: (r.left - shot.x).clamp(0, shot.w),
+        top: (r.top - shot.y).clamp(0, shot.h),
+        right: (r.right - shot.x).clamp(0, shot.w),
+        bottom: (r.bottom - shot.y).clamp(0, shot.h),
+    }
+}
+
+/// Every monitor's rect, in the screenshot's bitmap coordinates.
+pub fn monitor_rects(shot: &Screenshot) -> Vec<RECT> {
+    unsafe extern "system" fn cb(_m: HMONITOR, _dc: HDC, r: *mut RECT, data: LPARAM) -> windows::core::BOOL {
+        (*(data.0 as *mut Vec<RECT>)).push(*r);
+        TRUE
+    }
+    let mut screen: Vec<RECT> = Vec::new();
+    unsafe {
+        let _ = EnumDisplayMonitors(None, None, Some(cb), LPARAM(&mut screen as *mut _ as isize));
+    }
+    screen.iter().map(|r| to_bitmap_rect(shot, r)).collect()
+}
+
+/// Rects of the visible top-level windows, front to back, in the
+/// screenshot's bitmap coordinates. Call before the overlay exists.
+pub fn window_rects(shot: &Screenshot) -> Vec<RECT> {
+    unsafe extern "system" fn cb(hwnd: HWND, data: LPARAM) -> windows::core::BOOL {
+        let out = &mut *(data.0 as *mut Vec<RECT>);
+        if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+            return TRUE;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
+            return TRUE;
+        }
+        // Hidden UWP/virtual-desktop windows report as visible but cloaked.
+        let mut cloaked = 0u32;
+        if DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAKED,
+            &mut cloaked as *mut _ as *mut c_void,
+            std::mem::size_of::<u32>() as u32,
+        )
+        .is_ok()
+            && cloaked != 0
+        {
+            return TRUE;
+        }
+        // Click-through and fully transparent windows (e.g. GPU overlays
+        // that cover the whole screen) would swallow every hover.
+        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        if ex & WS_EX_TRANSPARENT.0 != 0 {
+            return TRUE;
+        }
+        if ex & WS_EX_LAYERED.0 != 0 {
+            let mut alpha = 255u8;
+            let mut flags = LAYERED_WINDOW_ATTRIBUTES_FLAGS(0);
+            if GetLayeredWindowAttributes(hwnd, None, Some(&mut alpha), Some(&mut flags)).is_ok()
+                && flags.0 & LWA_ALPHA.0 != 0
+                && alpha == 0
+            {
+                return TRUE;
+            }
+        }
+        // The desktop itself: fall through to "whole monitor" instead.
+        let mut class = [0u16; 32];
+        let n = GetClassNameW(hwnd, &mut class) as usize;
+        let class = String::from_utf16_lossy(&class[..n]);
+        if class == "Progman" || class == "WorkerW" {
+            return TRUE;
+        }
+        // The visible frame, without the invisible resize borders.
+        let mut r = RECT::default();
+        if DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            &mut r as *mut _ as *mut c_void,
+            std::mem::size_of::<RECT>() as u32,
+        )
+        .is_err()
+            && GetWindowRect(hwnd, &mut r).is_err()
+        {
+            return TRUE;
+        }
+        if r.right - r.left > 1 && r.bottom - r.top > 1 {
+            out.push(r);
+        }
+        TRUE
+    }
+    let mut screen: Vec<RECT> = Vec::new();
+    unsafe {
+        let _ = EnumWindows(Some(cb), LPARAM(&mut screen as *mut _ as isize));
+    }
+    screen
+        .iter()
+        .map(|r| to_bitmap_rect(shot, r))
+        .filter(|r| r.right - r.left > 1 && r.bottom - r.top > 1)
+        .collect()
+}
+
+/// A bitmap from top-down BGRA pixels.
+pub fn bitmap_from_bgra(bgra: &[u8], w: i32, h: i32) -> Option<HBITMAP> {
+    unsafe {
+        let sdc = GetDC(None);
+        let hbmp = CreateCompatibleBitmap(sdc, w, h);
+        let mut bi = BITMAPINFO::default();
+        bi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+        bi.bmiHeader.biWidth = w;
+        bi.bmiHeader.biHeight = -h; // top-down
+        bi.bmiHeader.biPlanes = 1;
+        bi.bmiHeader.biBitCount = 32;
+        bi.bmiHeader.biCompression = BI_RGB.0;
+        let n = SetDIBits(
+            Some(sdc),
+            hbmp,
+            0,
+            h as u32,
+            bgra.as_ptr() as *const c_void,
+            &bi,
+            DIB_RGB_COLORS,
+        );
+        ReleaseDC(None, sdc);
+        if n == 0 {
+            let _ = DeleteObject(hbmp.into());
+            return None;
+        }
+        Some(hbmp)
     }
 }
 

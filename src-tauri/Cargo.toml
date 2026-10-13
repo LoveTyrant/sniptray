@@ -1,6 +1,6 @@
 [package]
 name = "sniptray"
-version = "2.0.0"
+version = "1.0.4"
 edition = "2021"
 description = "Lightweight tray screenshot tool for Windows"
 authors = ["LoveTyrant"]
@@ -24,6 +24,7 @@ base64 = "0.22"
 version = "0.61"
 features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",

@@ -3,14 +3,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::System::Com::{
-    IDataObject, DVASPECT_CONTENT, FORMATETC, STGMEDIUM, STGMEDIUM_0, TYMED_HGLOBAL,
-};
+use windows::Win32::System::Com::IDataObject;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
-use windows::Win32::System::Ole::{
-    CF_UNICODETEXT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropSource,
-};
+use windows::Win32::System::Ole::{DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropSource};
 use windows::core::PWSTR;
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
@@ -42,8 +37,9 @@ struct ThumbState {
     press: Option<POINT>,
 }
 
-/// Show the floating preview. Takes ownership of `hbmp`.
-pub fn show(hbmp: HBITMAP, img_w: i32, img_h: i32, path: String) {
+/// Show the floating preview. Takes ownership of `hbmp`. `at` is a screen
+/// point inside the snipped region.
+pub fn show(hbmp: HBITMAP, img_w: i32, img_h: i32, path: String, at: POINT) {
     unsafe {
         let Ok(hmodule) = GetModuleHandleW(None) else {
             let _ = DeleteObject(hbmp.into());
@@ -72,9 +68,12 @@ pub fn show(hbmp: HBITMAP, img_w: i32, img_h: i32, path: String) {
         let win_w = thumb_w + border * 2;
         let win_h = thumb_h + bar_h + border * 2;
 
-        // Pin to the bottom-right of the primary monitor's work area,
-        // just above the taskbar clock.
-        let hmon = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
+        // Pin to the bottom-right of the work area, just above the taskbar
+        // clock: on the primary monitor, or (if configured) on the monitor
+        // the snip was taken on.
+        let on_snip_monitor = crate::config::CONFIG.lock().unwrap().thumb_on_snip_monitor;
+        let anchor = if on_snip_monitor { at } else { POINT { x: 0, y: 0 } };
+        let hmon = MonitorFromPoint(anchor, MONITOR_DEFAULTTOPRIMARY);
         let mut mi = MONITORINFO {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
             ..Default::default()
@@ -130,11 +129,10 @@ unsafe fn do_drag(hwnd: HWND, path: &str) -> bool {
         Ok(d) => d,
         Err(_) => return false,
     };
-    // Also offer the path as plain text. Some drop targets (e.g. terminals
-    // that hijack file drops for their own UI) will insert dropped text into
-    // the prompt instead — which is exactly what a TUI app such as Claude
-    // Code needs to pick the image up.
-    add_text_format(&dobj, path);
+    // Offer only the shell's file formats. Adding the path as text makes
+    // Chromium-based targets (Outlook, webmail) treat the drop as a link and
+    // navigate to it (about:blank#blocked) instead of attaching the file.
+    // Terminals that swallow file drops get the path via the assist below.
     let effect = SHDoDragDrop(
         Some(hwnd),
         &dobj,
@@ -241,35 +239,6 @@ unsafe fn send_unicode_string(s: &str) {
         }
     }
     let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-}
-
-/// Attach a CF_UNICODETEXT rendition of the file path to the drag data object.
-unsafe fn add_text_format(dobj: &IDataObject, path: &str) {
-    let w: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-    let bytes = w.len() * 2;
-    let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, bytes) else {
-        return;
-    };
-    let ptr = GlobalLock(hglobal);
-    if ptr.is_null() {
-        return;
-    }
-    std::ptr::copy_nonoverlapping(w.as_ptr() as *const u8, ptr as *mut u8, bytes);
-    let _ = GlobalUnlock(hglobal);
-    let fe = FORMATETC {
-        cfFormat: CF_UNICODETEXT.0,
-        ptd: std::ptr::null_mut(),
-        dwAspect: DVASPECT_CONTENT.0 as u32,
-        lindex: -1,
-        tymed: TYMED_HGLOBAL.0 as u32,
-    };
-    let sm = STGMEDIUM {
-        tymed: TYMED_HGLOBAL.0 as u32,
-        u: STGMEDIUM_0 { hGlobal: hglobal },
-        pUnkForRelease: std::mem::ManuallyDrop::new(None),
-    };
-    // fRelease = true: the data object takes ownership of the HGLOBAL.
-    let _ = dobj.SetData(&fe, &sm, true);
 }
 
 unsafe extern "system" fn wndproc(

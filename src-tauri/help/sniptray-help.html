@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SnipTray Help</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f6f7f9;
+    --text: #1d1f24;
+    --muted: #5d6270;
+    --border: #e2e4e9;
+    --accent: #3b82f6;
+    --accent-soft: #e8f0fe;
+    --kbd-bg: #ffffff;
+    --kbd-border: #c9ccd4;
+    --note-bg: #fff8e6;
+    --note-border: #f2c94c;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181c;
+      --panel: #1f2026;
+      --text: #e8e8ea;
+      --muted: #9a9aa3;
+      --border: #2e3038;
+      --accent: #5b9bff;
+      --accent-soft: #1d2a42;
+      --kbd-bg: #26272f;
+      --kbd-border: #3a3c46;
+      --note-bg: #2b2616;
+      --note-border: #8a6d1e;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  nav {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 18px 28px 24px;
+    border-right: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .logo {
+    width: 30px; height: 30px; border-radius: 7px; background: var(--accent);
+    position: relative; flex: none;
+  }
+  .logo::before {
+    content: ""; position: absolute; inset: 8px 8px 8px 8px;
+    border: 2px solid #fff; border-radius: 1px;
+  }
+  .logo::after {
+    content: ""; position: absolute; right: 5px; bottom: 5px;
+    width: 8px; height: 8px; background: #fff;
+  }
+  .brand strong { font-size: 17px; }
+  nav h2 {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 0 0 8px;
+  }
+  nav ol { list-style: none; margin: 0; padding: 0; }
+  nav li { margin: 1px 0; }
+  nav ol ol { padding-left: 12px; margin-bottom: 4px; }
+  nav a {
+    display: block; padding: 4px 10px; border-radius: 6px;
+    color: var(--text); text-decoration: none; font-size: 14px;
+  }
+  nav ol ol a { color: var(--muted); font-size: 13.5px; }
+  nav a:hover { background: var(--panel); }
+  nav a.active { background: var(--accent-soft); color: var(--accent); }
+  main { padding: 36px 44px 80px; min-width: 0; }
+  h1 { font-size: 30px; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 0 0 32px; font-size: 16px; }
+  section { padding-top: 8px; margin-bottom: 36px; }
+  h2.sec {
+    font-size: 22px; margin: 0 0 12px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 17px; margin: 24px 0 8px; }
+  p, li { max-width: 72ch; }
+  a { color: var(--accent); }
+  kbd {
+    display: inline-block; padding: 0 6px; min-width: 20px; text-align: center;
+    font: 12.5px/1.7 "Segoe UI", system-ui, sans-serif;
+    background: var(--kbd-bg); border: 1px solid var(--kbd-border);
+    border-bottom-width: 2px; border-radius: 5px; white-space: nowrap;
+  }
+  code {
+    font: 13px Consolas, "Cascadia Mono", monospace;
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px; word-break: break-all;
+  }
+  .table-wrap { overflow-x: auto; margin: 12px 0 16px; }
+  table { border-collapse: collapse; width: 100%; min-width: 420px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel); font-weight: 600; }
+  .note {
+    background: var(--note-bg); border-left: 3px solid var(--note-border);
+    padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 72ch;
+  }
+  .steps { padding-left: 22px; }
+  .steps li { margin: 4px 0; }
+  .top { font-size: 13px; color: var(--muted); text-decoration: none; }
+  .top:hover { color: var(--accent); }
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 16px; }
+
+  @media (max-width: 820px) {
+    .layout { display: block; }
+    nav {
+      position: static; height: auto; border-right: 0;
+      border-bottom: 1px solid var(--border); padding: 20px 16px;
+    }
+    main { padding: 24px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav aria-label="Table of contents">
+    <div class="brand"><span class="logo" aria-hidden="true"></span><strong>SnipTray Help</strong></div>
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#getting-started">Getting started</a></li>
+      <li><a href="#taking-a-snip">Taking a snip</a>
+        <ol>
+          <li><a href="#region">A region</a></li>
+          <li><a href="#window">A window</a></li>
+          <li><a href="#full-screen">A whole screen</a></li>
+          <li><a href="#delayed">Delayed snip</a></li>
+        </ol>
+      </li>
+      <li><a href="#after">After you snip</a>
+        <ol>
+          <li><a href="#preview">The preview</a></li>
+          <li><a href="#clipboard">Pasting</a></li>
+          <li><a href="#drag-drop">Drag and drop</a></li>
+        </ol>
+      </li>
+      <li><a href="#editor">Editing a snip</a></li>
+      <li><a href="#tray-menu">Tray menu</a>
+        <ol>
+          <li><a href="#recent">Recent snips</a></li>
+        </ol>
+      </li>
+      <li><a href="#settings">Settings</a>
+        <ol>
+          <li><a href="#set-hotkey">Hotkey</a></li>
+          <li><a href="#set-general">General</a></li>
+          <li><a href="#set-storage">Storage</a></li>
+        </ol>
+      </li>
+      <li><a href="#terminals">Terminals &amp; Claude Code</a></li>
+      <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#files">Where things are</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <h1>Using SnipTray</h1>
+    <p class="lede">SnipTray lives in the system tray and takes screenshots — a
+      region, a window, or a whole screen — then copies, saves, and lets you
+      drag them straight into other apps.</p>
+
+    <section id="getting-started">
+      <h2 class="sec">Getting started</h2>
+      <p>After installing, SnipTray runs in the <strong>system tray</strong> —
+        the blue square icon near the clock. If you don't see it, click the
+        <kbd>^</kbd> arrow next to the clock to show hidden icons, and drag
+        SnipTray onto the taskbar to keep it visible.</p>
+      <p>There are three ways to start a snip:</p>
+      <ul>
+        <li>Press the hotkey — <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>X</kbd> by
+          default (you can <a href="#set-hotkey">change it</a>).</li>
+        <li>Left-click the tray icon.</li>
+        <li>Right-click the tray icon → <strong>Snip now</strong>.</li>
+      </ul>
+      <p>SnipTray starts with Windows by default, so it's always ready.</p>
+    </section>
+
+    <section id="taking-a-snip">
+      <h2 class="sec">Taking a snip</h2>
+      <p>When you start a snip the screen freezes and dims. Whatever was on
+        screen at that moment is what you capture — even menus and pop-ups
+        that would normally close. A hint bar at the top of each screen
+        reminds you of the options.</p>
+
+      <h3 id="region">A region</h3>
+      <p>Press and drag a rectangle over the area you want, then let go. The
+        size in pixels is shown while you drag.</p>
+
+      <h3 id="window">A window</h3>
+      <p>Move the mouse — the window under the cursor lights up. <strong>Click</strong>
+        (without dragging) to snip just that window. Over the empty desktop,
+        a click snips the whole screen.</p>
+
+      <h3 id="full-screen">A whole screen</h3>
+      <p>While selecting, press <kbd>F</kbd> to snip the entire screen the cursor
+        is on. This works on any monitor.</p>
+      <p>You can also right-click the tray icon → <strong>Snip full screen</strong>.</p>
+      <div class="note">With more than one monitor, <strong>Snip full screen</strong>
+        from the tray menu captures the screen whose taskbar you opened the
+        menu from — usually your main screen. To snip a different monitor,
+        press the hotkey, move the cursor onto that monitor, and press <kbd>F</kbd>.</div>
+
+      <h3 id="delayed">Delayed snip</h3>
+      <p>Need to capture a menu, a tooltip, or something that only shows while
+        you hover? Right-click the tray icon → <strong>Delayed snip</strong> and
+        pick <strong>3</strong>, <strong>5</strong>, or <strong>10 seconds</strong>.
+        Open what you want to capture; when the time is up the screen freezes
+        and you select as usual.</p>
+
+      <p>To cancel at any point while selecting, press <kbd>Esc</kbd> or right-click.</p>
+    </section>
+
+    <section id="after">
+      <h2 class="sec">After you snip</h2>
+      <p>Every snip is automatically:</p>
+      <ul>
+        <li><strong>Saved</strong> as a PNG file in your snips folder
+          (<code>Pictures\Snips</code> unless you <a href="#set-storage">change it</a>).</li>
+        <li><strong>Copied</strong> to the clipboard, ready to paste.</li>
+        <li><strong>Shown</strong> as a small preview in the bottom-right corner.</li>
+      </ul>
+
+      <h3 id="preview">The preview</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>On the preview</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td>Drag it into another app</td><td>Drops the image file there — see <a href="#drag-drop">Drag and drop</a></td></tr>
+          <tr><td>Double-click</td><td>Opens the <a href="#editor">editor</a> to mark it up</td></tr>
+          <tr><td>Right-click</td><td>Closes the preview (the snip stays saved and copied)</td></tr>
+        </tbody>
+      </table></div>
+      <p>The preview appears on your main screen. To have it appear on the
+        screen you snipped instead, turn on
+        <a href="#set-general">Preview on snipped monitor</a>.</p>
+
+      <h3 id="clipboard">Pasting</h3>
+      <p>Press <kbd>Ctrl</kbd> + <kbd>V</kbd> in any app that accepts images —
+        email, chat, documents, image editors.</p>
+      <p>If <a href="#set-general">Copy file path as text</a> is on, the
+        file's location is copied too, so terminal apps paste the path instead.
+        If some app pastes a file path where you expected the picture, turn
+        that setting off.</p>
+
+      <h3 id="drag-drop">Drag and drop</h3>
+      <p>Drag the preview straight into an email (Outlook app or Outlook on the
+        web), a chat window, a folder, or a document to attach the image file.</p>
+    </section>
+
+    <section id="editor">
+      <h2 class="sec">Editing a snip</h2>
+      <p>Double-click the preview to open the editor.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Tool</th><th>Key</th><th>Use it to</th></tr></thead>
+        <tbody>
+          <tr><td>✏️ Pen</td><td><kbd>P</kbd></td><td>Draw freehand</td></tr>
+          <tr><td>🖍 Highlighter</td><td><kbd>H</kbd></td><td>Mark text with a see-through stroke — pick the yellow swatch for a classic highlighter</td></tr>
+          <tr><td>➚ Arrow</td><td><kbd>A</kbd></td><td>Point at something</td></tr>
+          <tr><td>▭ Rectangle</td><td><kbd>R</kbd></td><td>Box an area</td></tr>
+          <tr><td>◯ Ellipse</td><td><kbd>E</kbd></td><td>Circle an area</td></tr>
+          <tr><td>▒ Blur region</td><td><kbd>B</kbd></td><td>Hide sensitive details (passwords, names, numbers)</td></tr>
+          <tr><td>T Text</td><td><kbd>T</kbd></td><td>Add a label — click where it goes and type. <kbd>Enter</kbd> places it, <kbd>Shift</kbd> + <kbd>Enter</kbd> starts a new line, <kbd>Esc</kbd> cancels.</td></tr>
+          <tr><td>⛶ Crop</td><td><kbd>C</kbd></td><td>Trim the snip — drag a box around what to keep. Everything outside darkens while you drag; letting go crops, and you're back on the tool you were using.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Pick a <strong>color</strong> from the swatches and a <strong>line
+        width</strong> with the slider. <strong>⤢ Resize</strong> scales the
+        whole image — type a size, or use 25&nbsp;/ 50&nbsp;/ 75%; the 🔗 button
+        keeps the proportions.</p>
+      <p>When you're done, click <strong>Save &amp; copy</strong>
+        (<kbd>Ctrl</kbd> + <kbd>S</kbd>). This overwrites the saved file and puts
+        the edited version on the clipboard.</p>
+      <p>Undo with <kbd>Ctrl</kbd> + <kbd>Z</kbd>; redo with <kbd>Ctrl</kbd> +
+        <kbd>Y</kbd> or <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>.
+        Crop and resize can be undone too.</p>
+      <p>If you close the editor with changes you haven't saved, it asks
+        first: <strong>Save &amp; close</strong>, <strong>Don't save</strong>,
+        or <strong>Cancel</strong> to keep editing.</p>
+    </section>
+
+    <section id="tray-menu">
+      <h2 class="sec">Tray menu</h2>
+      <p>Right-click the tray icon:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Item</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td>Snip now</td><td>Same as the hotkey</td></tr>
+          <tr><td>Snip full screen</td><td>Snips a whole screen right away — see the <a href="#full-screen">multi-monitor note</a></td></tr>
+          <tr><td>Delayed snip</td><td>Snip in 3, 5, or 10 seconds</td></tr>
+          <tr><td>Recent snips</td><td>Your last five snips</td></tr>
+          <tr><td>Help</td><td>Opens this page</td></tr>
+          <tr><td>Settings…</td><td>Opens <a href="#settings">Settings</a></td></tr>
+          <tr><td>Open snips folder</td><td>Shows your saved snips in File Explorer</td></tr>
+          <tr><td>Exit</td><td>Closes SnipTray (the hotkey stops working until you start it again)</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 id="recent">Recent snips</h3>
+      <p>Lists your last five snips with the time and size, newest first.
+        Clicking one copies it to the clipboard again and brings back its
+        preview, so you can drag it into an app or double-click to edit it.</p>
+    </section>
+
+    <section id="settings">
+      <h2 class="sec">Settings</h2>
+      <p>Right-click the tray icon → <strong>Settings…</strong>. Changes save
+        immediately — you'll see <em>Saved ✓</em>.</p>
+
+      <h3 id="set-hotkey">Hotkey</h3>
+      <p>Click the hotkey box and press the new combination. Letters and
+        numbers need at least one of <kbd>Ctrl</kbd>, <kbd>Alt</kbd>,
+        <kbd>Shift</kbd>, or <kbd>Win</kbd>; function keys and <kbd>PrtSc</kbd>
+        can be used alone. Press <kbd>Esc</kbd> to keep the current one.</p>
+      <p>A hotkey works everywhere while SnipTray runs, so it takes that
+        combination away from other apps. If you pick one most apps already
+        use — like <kbd>Ctrl</kbd> + <kbd>Z</kbd> (undo) or <kbd>Ctrl</kbd> +
+        <kbd>S</kbd> (save) — Settings warns you. Combinations another program
+        has already claimed are refused.</p>
+
+      <h3 id="set-general">General</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Setting</th><th>What it does</th><th>Default</th></tr></thead>
+        <tbody>
+          <tr><td>Start with Windows</td><td>Starts SnipTray in the tray when you sign in</td><td>On</td></tr>
+          <tr><td>Preview on snipped monitor</td><td>Shows the preview on the screen you snipped, instead of the main screen</td><td>Off</td></tr>
+          <tr><td>Copy file path as text</td><td>Also copies the file's location, so terminal apps can paste the snip — see <a href="#terminals">Terminals</a></td><td>On</td></tr>
+          <tr><td>Terminal drop assist</td><td>Makes dragging a snip into Warp type the file path — see <a href="#terminals">Terminals</a></td><td>On</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 id="set-storage">Storage</h3>
+      <ul>
+        <li><strong>Save snips to</strong> — <strong>Browse…</strong> to pick a
+          folder, or <strong>Default</strong> to go back to <code>Pictures\Snips</code>.</li>
+        <li><strong>Delete old snips</strong> — <strong>Never</strong> (default),
+          after <strong>7</strong>, <strong>30</strong>, or <strong>90 days</strong>,
+          or <strong>Custom…</strong> to type any number of days (1–3650).
+          Old snips go to the <strong>Recycle Bin</strong>, so you can restore
+          them. Only files SnipTray created (named <code>snip_….png</code>) are
+          ever removed — anything else in the folder is left alone.</li>
+        <li><strong>Open folder</strong> — shows your snips in File Explorer.</li>
+      </ul>
+    </section>
+
+    <section id="terminals">
+      <h2 class="sec">Terminals &amp; Claude Code</h2>
+      <p>Terminal apps such as Claude Code can't receive a pasted picture, but
+        they can open a file from its path. With <strong>Copy file path as
+        text</strong> on, pressing <kbd>Ctrl</kbd> + <kbd>V</kbd> in a terminal
+        pastes the snip's path and Claude Code attaches the image.</p>
+      <p>Dragging the preview into Windows Terminal inserts the path
+        automatically. <strong>Warp</strong> handles dropped files itself, so
+        they never reach the program inside it — with <strong>Terminal drop
+        assist</strong> on, SnipTray notices the drop and types the path for you.</p>
+    </section>
+
+    <section id="shortcuts">
+      <h2 class="sec">Keyboard shortcuts</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Where</th><th>Keys</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td>Anywhere</td><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>X</kbd></td><td>Start a snip (default hotkey)</td></tr>
+          <tr><td>While selecting</td><td><kbd>F</kbd></td><td>Snip the whole screen under the cursor</td></tr>
+          <tr><td>While selecting</td><td><kbd>Esc</kbd></td><td>Cancel</td></tr>
+          <tr><td>Editor</td><td><kbd>P</kbd> <kbd>H</kbd> <kbd>A</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>B</kbd> <kbd>T</kbd> <kbd>C</kbd></td><td>Pen, Highlighter, Arrow, Rectangle, Ellipse, Blur, Text, Crop</td></tr>
+          <tr><td>Editor</td><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Save &amp; copy</td></tr>
+          <tr><td>Editor</td><td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td><td>Undo</td></tr>
+          <tr><td>Editor</td><td><kbd>Ctrl</kbd> + <kbd>Y</kbd> or <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td><td>Redo</td></tr>
+          <tr><td>Editor, text tool</td><td><kbd>Enter</kbd> / <kbd>Shift</kbd> + <kbd>Enter</kbd> / <kbd>Esc</kbd></td><td>Place text / new line / cancel</td></tr>
+          <tr><td>Settings, hotkey box</td><td><kbd>Esc</kbd></td><td>Keep the current hotkey</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="troubleshooting">
+      <h2 class="sec">Troubleshooting</h2>
+
+      <h3>The hotkey does nothing</h3>
+      <p>Another program may already be using that combination. When this
+        happens at startup, SnipTray opens Settings with an explanation and
+        the tray tooltip says <em>hotkey unavailable</em>. Pick a different
+        hotkey — until then, left-clicking the tray icon still snips.</p>
+
+      <h3>Pressing the hotkey snips instead of doing something in another app</h3>
+      <p>A global hotkey takes priority over every app. Choose a combination
+        you don't use elsewhere in <a href="#set-hotkey">Settings</a>.</p>
+
+      <h3>An app pastes a file path instead of the picture</h3>
+      <p>Turn off <strong>Copy file path as text</strong> in
+        <a href="#set-general">Settings</a>.</p>
+
+      <h3>Snip full screen captures the wrong monitor</h3>
+      <p>See the <a href="#full-screen">multi-monitor note</a>: press the
+        hotkey, move to the monitor you want, and press <kbd>F</kbd>.</p>
+
+      <h3>The icon still looks old after an update</h3>
+      <p>Windows caches program icons. Signing out and back in (or restarting)
+        refreshes them.</p>
+
+      <h3>SnipTray isn't running</h3>
+      <p>Start it from the Start menu or the desktop shortcut. Starting it a
+        second time while it's already running opens Settings.</p>
+    </section>
+
+    <section id="files">
+      <h2 class="sec">Where things are</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>What</th><th>Location</th></tr></thead>
+        <tbody>
+          <tr><td>Your snips</td><td><code>Pictures\Snips</code> (or the folder you chose)</td></tr>
+          <tr><td>Settings file</td><td><code>%APPDATA%\SnipTray\config.json</code></td></tr>
+          <tr><td>The app</td><td><code>%LOCALAPPDATA%\SnipTray</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>To uninstall, open Windows <strong>Settings → Apps → Installed
+        apps</strong>, find <strong>SnipTray</strong>, and choose
+        <strong>Uninstall</strong>. Your saved snips are kept.</p>
+    </section>
+
+    <footer>
+      SnipTray · <a class="top" href="#getting-started">Back to top ↑</a>
+    </footer>
+  </main>
+</div>
+<script>
+  // Highlight the table-of-contents entry for the section in view.
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll("nav a[href^='#']"));
+    var byId = {};
+    links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+    var targets = links
+      .map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+      .filter(Boolean);
+    function update() {
+      var current = targets[0];
+      for (var i = 0; i < targets.length; i++) {
+        if (targets[i].getBoundingClientRect().top <= 80) current = targets[i];
+      }
+      links.forEach(function (a) { a.classList.remove("active"); });
+      if (current && byId[current.id]) byId[current.id].classList.add("active");
+    }
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+  })();
+</script>
+</body>
+</html>

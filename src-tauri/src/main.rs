@@ -3,6 +3,7 @@
 
 mod capture;
 mod config;
+mod history;
 mod overlay;
 mod snip;
 mod thumb;
@@ -13,14 +14,21 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{LazyLock, Mutex, OnceLock};
 
 use base64::Engine;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_autostart::MacosLauncher;
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 pub static OVERLAY_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// True while the Settings window is capturing a new hotkey. The global
+/// shortcut stays registered, but the handler ignores presses, so pressing
+/// the current hotkey to reassign it doesn't fire a snip.
+static CAPTURING_HOTKEY: AtomicBool = AtomicBool::new(false);
 static APP: OnceLock<AppHandle> = OnceLock::new();
+/// Set when the configured hotkey couldn't be registered; shown in Settings
+/// until a hotkey is registered successfully.
+static HOTKEY_ERROR: Mutex<Option<String>> = Mutex::new(None);
 static EDITOR_SEQ: AtomicU32 = AtomicU32::new(0);
 static EDITOR_PATHS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -45,6 +53,104 @@ pub fn snip_on_main_thread() {
     }
 }
 
+/// Snip after a delay, so menus and hover states can be opened first.
+fn snip_after(secs: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(secs));
+        snip_on_main_thread();
+    });
+}
+
+/// Snip the whole monitor under the cursor, without the selection overlay.
+fn start_full_snip() {
+    if OVERLAY_ACTIVE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    if let Some(shot) = capture::capture_virtual_screen() {
+        let mut pt = windows::Win32::Foundation::POINT::default();
+        let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt) };
+        let p = windows::Win32::Foundation::POINT { x: pt.x - shot.x, y: pt.y - shot.y };
+        let r = capture::monitor_rects(&shot)
+            .into_iter()
+            .find(|r| capture::rect_contains(r, p))
+            .unwrap_or(windows::Win32::Foundation::RECT {
+                left: 0,
+                top: 0,
+                right: shot.w,
+                bottom: shot.h,
+            });
+        snip::complete(&shot, r);
+    }
+    OVERLAY_ACTIVE.store(false, Ordering::SeqCst);
+}
+
+fn full_snip_on_main_thread() {
+    // Give the tray menu a moment to fade out so it isn't in the shot.
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        if let Some(app) = APP.get() {
+            let _ = app.run_on_main_thread(start_full_snip);
+        }
+    });
+}
+
+/// Re-copy a recent snip and bring its preview back (to drag or edit).
+fn open_recent(path: String) {
+    let Ok(bytes) = std::fs::read(&path) else {
+        // Deleted since the menu was built.
+        refresh_tray_menu();
+        return;
+    };
+    snip::reclip_png(&bytes, &path);
+    let Some((bgra, w, h)) = snip::decode_png_bgra(&bytes) else { return };
+    let Some(hbmp) = capture::bitmap_from_bgra(&bgra, w, h) else { return };
+    let mut pt = windows::Win32::Foundation::POINT::default();
+    let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt) };
+    thumb::show(hbmp, w, h, path, pt);
+}
+
+fn build_tray_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    let delayed = SubmenuBuilder::new(app, "Delayed snip")
+        .item(&MenuItemBuilder::with_id("delay:3", "In 3 seconds").build(app)?)
+        .item(&MenuItemBuilder::with_id("delay:5", "In 5 seconds").build(app)?)
+        .item(&MenuItemBuilder::with_id("delay:10", "In 10 seconds").build(app)?)
+        .build()?;
+    let mut recent = SubmenuBuilder::new(app, "Recent snips");
+    let files = history::recent(5);
+    if files.is_empty() {
+        recent = recent.item(
+            &MenuItemBuilder::with_id("recent-none", "No snips yet").enabled(false).build(app)?,
+        );
+    }
+    for p in files {
+        let id = format!("recent:{}", p.to_string_lossy());
+        recent = recent.item(&MenuItemBuilder::with_id(id, history::label(&p)).build(app)?);
+    }
+    MenuBuilder::new(app)
+        .item(&MenuItemBuilder::with_id("snip", "Snip now").build(app)?)
+        .item(&MenuItemBuilder::with_id("snip-full", "Snip full screen").build(app)?)
+        .item(&delayed)
+        .item(&recent.build()?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("help", "Help").build(app)?)
+        .item(&MenuItemBuilder::with_id("settings", "Settings…").build(app)?)
+        .item(&MenuItemBuilder::with_id("folder", "Open snips folder").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("quit", "Exit").build(app)?)
+        .build()
+}
+
+/// Rebuild the tray menu (its Recent snips list changes after each snip).
+pub fn refresh_tray_menu() {
+    let Some(app) = APP.get() else { return };
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        if let (Ok(menu), Some(tray)) = (build_tray_menu(&app), app.tray_by_id("main")) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    });
+}
+
 /// Open the annotation editor for a saved snip (called from the thumbnail).
 pub fn open_editor(path: String) {
     let Some(app) = APP.get() else { return };
@@ -61,18 +167,60 @@ pub fn open_editor(path: String) {
     });
 }
 
+fn focused_editor(app: &AppHandle) -> Option<String> {
+    app.webview_windows()
+        .into_iter()
+        .find(|(label, w)| label.starts_with("editor-") && w.is_focused().unwrap_or(false))
+        .map(|(label, _)| label)
+}
+
 fn open_settings(app: &AppHandle) {
+    // Opening Settings ends any prior hotkey-capture state.
+    CAPTURING_HOTKEY.store(false, Ordering::SeqCst);
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.show();
         let _ = w.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
-        .title("SnipTray Settings")
-        .inner_size(500.0, 570.0)
-        .resizable(false)
-        .maximizable(false)
-        .build();
+    if let Ok(win) =
+        WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
+            .title("SnipTray Settings")
+            .inner_size(500.0, 780.0)
+            .resizable(false)
+            .maximizable(false)
+            .build()
+    {
+        // If the window is closed mid-capture, don't leave snips suspended.
+        win.on_window_event(|event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+            ) {
+                CAPTURING_HOTKEY.store(false, Ordering::SeqCst);
+            }
+        });
+    }
+}
+
+/// Open the bundled help page in the default browser.
+fn open_help(app: &AppHandle) {
+    let Ok(path) = app
+        .path()
+        .resolve("sniptray-help.html", tauri::path::BaseDirectory::Resource)
+    else {
+        return;
+    };
+    let w = util::wide(&path.to_string_lossy());
+    unsafe {
+        windows::Win32::UI::Shell::ShellExecuteW(
+            None,
+            windows::core::w!("open"),
+            windows::core::PCWSTR(w.as_ptr()),
+            None,
+            None,
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+        );
+    }
 }
 
 fn open_snips_dir() {
@@ -107,6 +255,9 @@ fn pretty_hotkey(hk: &str) -> String {
 }
 
 fn tray_tooltip() -> String {
+    if HOTKEY_ERROR.lock().unwrap().is_some() {
+        return "SnipTray — hotkey unavailable, click to snip".to_string();
+    }
     format!(
         "SnipTray — {} to snip",
         pretty_hotkey(&config::CONFIG.lock().unwrap().hotkey)
@@ -166,6 +317,11 @@ fn get_settings() -> config::Config {
 }
 
 #[tauri::command]
+fn get_hotkey_error() -> Option<String> {
+    HOTKEY_ERROR.lock().unwrap().clone()
+}
+
+#[tauri::command]
 fn effective_save_dir() -> String {
     config::snips_dir(&config::CONFIG.lock().unwrap())
         .to_string_lossy()
@@ -187,12 +343,31 @@ fn set_terminal_drop_assist(value: bool) {
 }
 
 #[tauri::command]
+fn set_thumb_on_snip_monitor(value: bool) {
+    let mut c = config::CONFIG.lock().unwrap();
+    c.thumb_on_snip_monitor = value;
+    c.save();
+}
+
+#[tauri::command]
+fn set_delete_after_days(value: u32) {
+    {
+        let mut c = config::CONFIG.lock().unwrap();
+        c.delete_after_days = value;
+        c.save();
+    }
+    history::cleanup_async();
+}
+
+#[tauri::command]
 fn set_save_dir(dir: String) -> String {
     {
         let mut c = config::CONFIG.lock().unwrap();
         c.save_dir = dir;
         c.save();
     }
+    // The Recent list follows the snips folder.
+    refresh_tray_menu();
     effective_save_dir()
 }
 
@@ -208,6 +383,9 @@ fn set_hotkey(app: AppHandle, shortcut: String) -> Result<String, String> {
                 c.hotkey = shortcut.clone();
                 c.save();
             }
+            // The capture is done; re-enable the handler for the new hotkey.
+            CAPTURING_HOTKEY.store(false, Ordering::SeqCst);
+            *HOTKEY_ERROR.lock().unwrap() = None;
             if let Some(tray) = app.tray_by_id("main") {
                 let _ = tray.set_tooltip(Some(tray_tooltip()));
             }
@@ -218,6 +396,20 @@ fn set_hotkey(app: AppHandle, shortcut: String) -> Result<String, String> {
             Err(format!("Couldn't register that combination ({e})"))
         }
     }
+}
+
+#[tauri::command]
+fn begin_hotkey_capture() {
+    // Suspend snips while the user presses keys to pick a new hotkey, so the
+    // current combo doesn't trigger a capture mid-reassignment.
+    CAPTURING_HOTKEY.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn end_hotkey_capture() {
+    // Capture cancelled: the configured hotkey is still registered, so just
+    // re-enable the handler.
+    CAPTURING_HOTKEY.store(false, Ordering::SeqCst);
 }
 
 #[tauri::command]
@@ -273,20 +465,37 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|_app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        snip_on_main_thread();
+                .with_handler(|app, _shortcut, event| {
+                    if CAPTURING_HOTKEY.load(Ordering::SeqCst) {
+                        return;
                     }
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    // The global hotkey swallows the keystroke, so a combo
+                    // like Ctrl+Shift+Z would break the editor's redo. When
+                    // an editor is focused, hand the keys to it instead.
+                    if let Some(label) = focused_editor(app) {
+                        let hk = config::CONFIG.lock().unwrap().hotkey.clone();
+                        let _ = app.emit_to(label.as_str(), "hotkey-passthrough", hk);
+                        return;
+                    }
+                    snip_on_main_thread();
                 })
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
             get_settings,
+            get_hotkey_error,
             effective_save_dir,
             set_clipboard_path_text,
             set_terminal_drop_assist,
+            set_thumb_on_snip_monitor,
+            set_delete_after_days,
             set_save_dir,
             set_hotkey,
+            begin_hotkey_capture,
+            end_hotkey_capture,
             snip_now,
             open_folder,
             get_editor_path,
@@ -297,15 +506,7 @@ fn main() {
             let handle = app.handle().clone();
             let _ = APP.set(handle.clone());
 
-            let snip_i = MenuItemBuilder::with_id("snip", "Snip now").build(app)?;
-            let settings_i = MenuItemBuilder::with_id("settings", "Settings…").build(app)?;
-            let folder_i = MenuItemBuilder::with_id("folder", "Open snips folder").build(app)?;
-            let quit_i = MenuItemBuilder::with_id("quit", "Exit").build(app)?;
-            let menu = MenuBuilder::new(app)
-                .items(&[&snip_i, &settings_i, &folder_i])
-                .separator()
-                .item(&quit_i)
-                .build()?;
+            let menu = build_tray_menu(&handle)?;
 
             TrayIconBuilder::with_id("main")
                 .icon(tray_icon_image())
@@ -314,10 +515,18 @@ fn main() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "snip" => snip_on_main_thread(),
+                    "snip-full" => full_snip_on_main_thread(),
+                    "help" => open_help(app),
                     "settings" => open_settings(app),
                     "folder" => open_snips_dir(),
                     "quit" => app.exit(0),
-                    _ => {}
+                    id => {
+                        if let Some(secs) = id.strip_prefix("delay:") {
+                            snip_after(secs.parse().unwrap_or(3));
+                        } else if let Some(path) = id.strip_prefix("recent:") {
+                            open_recent(path.to_string());
+                        }
+                    }
                 })
                 .on_tray_icon_event(|_tray, event| {
                     if let TrayIconEvent::Click {
@@ -332,8 +541,35 @@ fn main() {
                 .build(app)?;
 
             let hk = config::CONFIG.lock().unwrap().hotkey.clone();
-            // Failure is non-fatal: the user can pick another combo in Settings.
-            let _ = handle.global_shortcut().register(hk.as_str());
+            // Failure is non-fatal, but say so: flag it in the tray tooltip
+            // and open Settings, which shows the error, so the user can pick
+            // another combo instead of wondering why nothing happens.
+            if let Err(e) = handle.global_shortcut().register(hk.as_str()) {
+                *HOTKEY_ERROR.lock().unwrap() = Some(format!(
+                    "{} couldn't be registered — another app may be using it ({e}). \
+                     Pick a different hotkey.",
+                    pretty_hotkey(&hk)
+                ));
+                if let Some(tray) = handle.tray_by_id("main") {
+                    let _ = tray.set_tooltip(Some(tray_tooltip()));
+                }
+                open_settings(&handle);
+            }
+
+            // Start with Windows is on by default: enable it once, on first
+            // launch, so a later opt-out in Settings sticks.
+            {
+                let mut c = config::CONFIG.lock().unwrap();
+                if c.first_run {
+                    let _ = handle.autolaunch().enable();
+                    c.first_run = false;
+                    c.save();
+                }
+            }
+
+            // Prune old snips at startup too (the app may run for days, but
+            // also may not have run since they aged out).
+            history::cleanup_async();
             Ok(())
         })
         .build(tauri::generate_context!())

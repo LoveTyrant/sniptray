@@ -9,7 +9,7 @@ use windows::Win32::System::Memory::*;
 use windows::Win32::System::Ole::{CF_DIB, CF_UNICODETEXT};
 use windows::Win32::System::SystemInformation::GetLocalTime;
 
-use crate::{capture, config, thumb};
+use crate::{capture, config, history, thumb};
 
 /// Called by the overlay once a region has been selected (bitmap coordinates).
 pub fn complete(shot: &capture::Screenshot, sel: RECT) {
@@ -25,16 +25,30 @@ pub fn complete(shot: &capture::Screenshot, sel: RECT) {
     if let Some(ref png) = png {
         set_clipboard(&bgra, w, h, png, path.as_deref());
     }
+    // Centre of the selection in screen coordinates.
+    let at = POINT {
+        x: shot.x + (sel.left + sel.right) / 2,
+        y: shot.y + (sel.top + sel.bottom) / 2,
+    };
     match path {
-        Some(p) => thumb::show(hcrop, w, h, p),
+        Some(p) => thumb::show(hcrop, w, h, p, at),
         None => unsafe {
             let _ = DeleteObject(hcrop.into());
         },
     }
+    // Prunes old snips (if enabled), then refreshes the Recent menu.
+    history::cleanup_async();
 }
 
 /// Re-set the clipboard from edited PNG bytes (used by the editor's save).
 pub fn reclip_png(png_bytes: &[u8], path: &str) -> Option<()> {
+    let (bgra, w, h) = decode_png_bgra(png_bytes)?;
+    set_clipboard(&bgra, w, h, png_bytes, Some(path));
+    Some(())
+}
+
+/// Top-down BGRA pixels (alpha forced opaque) and size of a PNG.
+pub fn decode_png_bgra(png_bytes: &[u8]) -> Option<(Vec<u8>, i32, i32)> {
     let decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
     let mut reader = decoder.read_info().ok()?;
     let mut buf = vec![0u8; reader.output_buffer_size()];
@@ -60,8 +74,7 @@ pub fn reclip_png(png_bytes: &[u8], path: &str) -> Option<()> {
         }
         _ => return None,
     }
-    set_clipboard(&bgra, w, h, png_bytes, Some(path));
-    Some(())
+    Some((bgra, w, h))
 }
 
 pub fn encode_png(bgra: &[u8], w: i32, h: i32) -> Option<Vec<u8>> {

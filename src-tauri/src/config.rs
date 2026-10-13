@@ -25,17 +25,24 @@ pub struct Config {
     pub terminal_drop_assist: bool,
     /// Lower-case executable names that swallow file drops.
     pub terminal_drop_processes: Vec<String>,
+    /// Show the preview thumbnail on the monitor the snip was taken on,
+    /// instead of always on the primary monitor.
+    pub thumb_on_snip_monitor: bool,
+    /// Move snips older than this many days to the Recycle Bin; 0 = never.
+    pub delete_after_days: u32,
     pub first_run: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            hotkey: "Control+PrintScreen".to_string(),
+            hotkey: "Control+Shift+KeyX".to_string(),
             save_dir: String::new(),
             clipboard_path_text: true,
             terminal_drop_assist: true,
             terminal_drop_processes: vec!["warp.exe".to_string()],
+            thumb_on_snip_monitor: false,
+            delete_after_days: 0,
             first_run: true,
         }
     }
