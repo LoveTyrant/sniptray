@@ -28,3 +28,6 @@ desktop.ini
 
 # Claude Code local tooling
 .claude/
+
+# Local notes (release notes drafts, etc.)
+/docs/
