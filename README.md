@@ -5,6 +5,17 @@ Native Win32 capture core (instant, multi-monitor, per-monitor-DPI aware)
 wrapped in a [Tauri 2](https://tauri.app) shell with a React UI for settings
 and annotation.
 
+## Download
+
+Get the latest installer from the
+[Releases page](https://github.com/LoveTyrant/sniptray/releases/latest) —
+download `SnipTray_<version>_x64-setup.exe` and run it. It installs for your
+Windows account only (no admin rights needed) and SnipTray starts in the
+system tray. Windows 10 or 11, 64-bit.
+
+> **"Windows protected your PC"?** The installer isn't code-signed yet, so
+> SmartScreen may warn you. Click **More info → Run anyway**.
+
 ## Features
 
 - **Global hotkey** (default `Ctrl+Shift+X`) or left-click the tray icon to snip
@@ -114,6 +125,12 @@ and uninstaller use the same icon (`tauri.conf.json` → `bundle.windows.nsis`).
 
 **Version** lives in `package.json`, `package-lock.json`,
 `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` — keep them in sync.
+
+**Releasing:** bump the version, commit, and push a matching tag
+(`git tag v1.2.3 && git push origin v1.2.3`). The
+[release workflow](.github/workflows/release.yml) runs the tests, builds the
+installer on GitHub, and attaches it to a draft release — review the notes
+and publish it from the Releases page.
 
 **Tests:** `cargo test` (from `src-tauri`).
 
