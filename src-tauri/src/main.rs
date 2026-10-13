@@ -174,6 +174,29 @@ fn focused_editor(app: &AppHandle) -> Option<String> {
         .map(|(label, _)| label)
 }
 
+/// The primary monitor's usable area (excluding the taskbar) in logical
+/// pixels. Read from Win32: Tauri's `Monitor::work_area` comes back empty.
+fn primary_work_area(app: &AppHandle) -> Option<(f64, f64)> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
+    };
+    let scale = app.primary_monitor().ok()??.scale_factor();
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    unsafe {
+        let hmon = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
+        if !GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            return None;
+        }
+    }
+    let r = mi.rcWork;
+    let (w, h) = ((r.right - r.left) as f64 / scale, (r.bottom - r.top) as f64 / scale);
+    (w > 0.0 && h > 0.0).then_some((w, h))
+}
+
 fn open_settings(app: &AppHandle) {
     // Opening Settings ends any prior hotkey-capture state.
     CAPTURING_HOTKEY.store(false, Ordering::SeqCst);
@@ -182,12 +205,22 @@ fn open_settings(app: &AppHandle) {
         let _ = w.set_focus();
         return;
     }
+    // Fit the window to the screen's usable area (minus taskbar and title
+    // bar): on small or high-scaling screens the full height doesn't fit.
+    // The page scrolls, and the window can be resized either way.
+    let (mut w, mut h) = (500.0_f64, 780.0_f64);
+    if let Some((aw, ah)) = primary_work_area(app) {
+        w = w.min(aw - 32.0);
+        h = h.min(ah - 80.0);
+    }
+    let (min_w, min_h) = (420.0_f64, 320.0_f64);
     if let Ok(win) =
         WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
             .title("SnipTray Settings")
-            .inner_size(500.0, 780.0)
-            .resizable(false)
-            .maximizable(false)
+            .inner_size(w.max(min_w), h.max(min_h))
+            .min_inner_size(min_w, min_h)
+            .resizable(true)
+            .center()
             .build()
     {
         // If the window is closed mid-capture, don't leave snips suspended.
